@@ -11,6 +11,8 @@ use walkdir::{DirEntry, WalkDir};
 
 extern crate humansize;
 
+/// Files are read in 16KiB chunks to maximize BLAKE3 parallelization
+/// (read more here: https://github.com/BLAKE3-team/BLAKE3/blob/8c350836b81477a5ea49f14e5ca636f1eb1102f5/b3sum/src/main.rs#L256)
 const CHUNK_SIZE: usize = 16 * 1024;
 
 #[derive(StructOpt)]
@@ -24,13 +26,14 @@ struct Cli {
 fn main() {
     let args = Cli::from_args();
 
-    // Start a timer to measure performance
+    // Start a time to measure performance
     let timer = Instant::now();
 
     // Hash every file in A and B directories
     let (path_to_hash_a, size_a) = hash_files(&args.path_a);
     let (path_to_hash_b, size_b) = hash_files(&args.path_b);
 
+    // Build a set of files path in A and B
     let files_a: HashSet<&PathBuf> = path_to_hash_a.keys().collect();
     let files_b: HashSet<&PathBuf> = path_to_hash_b.keys().collect();
 
@@ -47,10 +50,13 @@ fn main() {
         .filter(|(_, hash_a, hash_b)| hash_a != hash_b)
         .collect();
 
+    // Build a list of files in A but not in B
     let diff_a_b: Vec<(&PathBuf, &String)> = files_a
         .difference(&files_b)
         .map(|path| (*path, path_to_hash_a.get(*path).unwrap()))
         .collect();
+
+    // Build a list of files in B but not in A
     let diff_b_a: Vec<(&PathBuf, &String)> = files_b
         .difference(&files_a)
         .map(|path| (*path, path_to_hash_b.get(*path).unwrap()))
@@ -85,6 +91,7 @@ fn main() {
         timer.elapsed(),
     );
 
+    // If folders files are the same...
     if different_hash_files.len() + diff_a_b.len() + diff_b_a.len() == 0 {
         println!(
             "Great! {} and {} are equal!",
@@ -94,6 +101,17 @@ fn main() {
     }
 }
 
+/// Compute the hash of every file inside input directory
+///
+/// Hash function is BLAKE3 and file hash is compatible with `b3sum`
+///
+/// Prints a progress bar using `indicatif`
+///
+/// Hashes are computes in parallel at file level using `rayon`
+///
+/// NOTE: Silently skips files that can't be opened
+///
+/// Outputs a map of file path and hash, and the total computed bytes
 fn hash_files(directory: &Path) -> (HashMap<PathBuf, String>, usize) {
     let dir = directory.canonicalize().unwrap();
     // Get all files and directories inside `dir`
@@ -106,21 +124,26 @@ fn hash_files(directory: &Path) -> (HashMap<PathBuf, String>, usize) {
         // Transform `DirEntry` into a `PathBuf`
         .map(|e: DirEntry| e.into_path())
         .collect::<Vec<PathBuf>>();
+    // Setup the progressbar template
     let pb = ProgressBar::new(files.len() as u64);
     pb.set_style(ProgressStyle::default_bar().template(
         "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] ({pos}/{len}, ETA {eta})",
     ));
+    // Compute files hash in parallel! (thanks to Rayon)
+    // TODO: Customize threads number
     let hashed_files: HashMap<PathBuf, (String, usize)> = files
         .par_iter()
-        .progress_with(pb)
+        .progress_with(pb) // Show a progress bar while computing hashes (# of hashed files)
         // Compute file hash and build up a pair to create the output hashmap
         .map(|path: &PathBuf| (hash_file(&path).unwrap(), path))
-        // I'm stupid... I understand why I can't do this directly in the line above,
-        //   but I didn't find a way around it
+        // NOTE: I'm stupid... I understand why I can't do this directly in the line above,
+        //       but I didn't find a way around it
         // NOTE: Also strip base directory prefix from path
         .map(|(hash, path)| (path.strip_prefix(&dir).unwrap().to_path_buf(), hash))
         .collect();
+    // Get the total number of bytes processed to print some performace infos
     let total_size = hashed_files.iter().map(|(_, (_, bytes))| bytes).sum();
+    // Remove processed bytes info from output map
     let hashes = hashed_files
         .into_iter()
         .map(|(path, (hash, _))| (path, hash))
@@ -128,6 +151,11 @@ fn hash_files(directory: &Path) -> (HashMap<PathBuf, String>, usize) {
     (hashes, total_size)
 }
 
+/// Compute BLAKE3 hash of input path
+///
+/// Function output is compatible with `b3sum`
+///
+/// NOTE: It's single-threaded and does not "mmap" files
 fn hash_file(path: &std::path::Path) -> std::io::Result<(String, usize)> {
     let mut hash = blake3::Hasher::new();
     let mut buffer: [u8; CHUNK_SIZE] = [0; CHUNK_SIZE];
