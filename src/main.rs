@@ -69,17 +69,17 @@ fn main() {
     //
 
     // Show if there are files with the same path but different hash
-    if different_hash_files.len() > 0 {
+    if !different_hash_files.is_empty() {
         print_different_hash(&different_hash_files);
     }
 
     // Show if there are files in A but not in B
-    if diff_a_b.len() > 0 {
+    if !diff_a_b.is_empty() {
         print_diff(&args.path_a, &args.path_b, &diff_a_b);
     }
 
     // Show if there are files in B but not in A
-    if diff_b_a.len() > 0 {
+    if !diff_b_a.is_empty() {
         print_diff(&args.path_b, &args.path_a, &diff_b_a);
     }
 
@@ -174,13 +174,13 @@ fn hash_file(path: &std::path::Path) -> std::io::Result<(String, usize)> {
 }
 
 // Files with same path and different hash
-fn print_different_hash(files: &Vec<(&PathBuf, &String, &String)>) {
+fn print_different_hash(files: &[(&PathBuf, &String, &String)]) {
     let mut tw = TabWriter::new(vec![]);
     tw.write_all(b"\n\n>>> Files with same path but with different hash\n\n")
         .unwrap();
-    tw.write(b"\tpath\thash A\thash B\n").unwrap();
+    tw.write_all(b"\tpath\thash A\thash B\n").unwrap();
     for (path, hash_a, hash_b) in files {
-        tw.write(format!("\t{}\t{}\t{}\n", path.to_str().unwrap(), hash_a, hash_b,).as_bytes())
+        tw.write_all(format!("\t{}\t{}\t{}\n", path.to_str().unwrap(), hash_a, hash_b,).as_bytes())
             .unwrap();
     }
     tw.flush().unwrap();
@@ -189,7 +189,7 @@ fn print_different_hash(files: &Vec<(&PathBuf, &String, &String)>) {
 }
 
 // Files in A but not in B
-fn print_diff(path_a: &PathBuf, path_b: &PathBuf, path_hash: &Vec<(&PathBuf, &String)>) {
+fn print_diff(path_a: &PathBuf, path_b: &PathBuf, path_hash: &[(&PathBuf, &String)]) {
     let mut tw = TabWriter::new(vec![]);
     tw.write_all(
         format!(
@@ -200,7 +200,7 @@ fn print_diff(path_a: &PathBuf, path_b: &PathBuf, path_hash: &Vec<(&PathBuf, &St
         .as_bytes(),
     )
     .unwrap();
-    tw.write(
+    tw.write_all(
         format!(
             "\tpath\thash {}\thash {}\n",
             path_a.to_str().unwrap(),
