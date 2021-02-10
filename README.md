@@ -1,5 +1,7 @@
 # `ddiff`
 
+![Format, Lint & Test](https://github.com/biosan/ddiff/workflows/Format,%20Lint%20&%20Test/badge.svg) ![Build & Release](https://github.com/biosan/ddiff/workflows/Build%20&%20Release/badge.svg) 
+
 A small utility that checks if two folders are the same.
 
 
@@ -27,7 +29,7 @@ So I decided to build a tool to solve this problem.
     cargo install ddiff
     ```
 
-2. ~~Download binary from [releases](https://github.com/biosan/dirdiff/releases) page and add it to you `$PATH`. *Available for linux and macOS on "x86"*~~
+2. Download binary from [releases](https://github.com/biosan/ddiff/releases) page and add it to you `$PATH`. *Available for linux and macOS on "x86"*
 
 
 ## Usage
@@ -110,7 +112,7 @@ This repo follow [Conventional Commits](https://www.conventionalcommits.org/en/v
 
 ### Continuous Integration/Delivery
 
-This project use GitHub Actions for CI and ~~building releases~~.
+This project use GitHub Actions for CI and building releases.
 
 Thanks to the awesome [`action-rs`](https://github.com/action-rs) project.
 

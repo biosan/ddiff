@@ -1,0 +1,124 @@
+on:
+  push:
+    tags:
+      - "v*"
+
+name: Build & Release
+
+env:
+  BIN: ddiff
+
+jobs:
+  # Add format, lint and test steps from CI
+  #   to prevent creation of "invalid" releases
+  format-lint-test:
+    name: Format, Lint & Test before Releasing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+      - name: Run cargo fmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+      - name: Run cargo clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: -- -D warnings
+      - name: Run cargo test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+
+  create-release:
+    name: Create Release
+    needs: format-lint-test
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+  build-linux:
+    name: Build on Linux
+    needs: create-release
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - x86_64-unknown-linux-musl
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --release --target=${{ matrix.target }}
+      - name: Tar & Zip binary for release
+        run: tar -czvf ${{ env.BIN }}.tar.gz --directory=target/${{ matrix.target }}/release ${{ env.BIN }}
+      - name: Upload Release Asset
+        id: upload-release-asset 
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ${{ env.BIN }}.tar.gz
+          asset_name: ${{ env.BIN }}-${{ matrix.target }}.tar.gz
+          asset_content_type: application/gzip
+
+  build-macos:
+    name: Build on macOS
+    needs: create-release
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target:
+          - x86_64-apple-darwin
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --release --target=${{ matrix.target }}
+      - name: Tar & Zip binary for release
+        run: tar -czvf ${{ env.BIN }}.tar.gz --directory=target/${{ matrix.target }}/release ${{ env.BIN }}
+      - name: Upload Release Asset
+        id: upload-release-asset 
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ${{ env.BIN }}.tar.gz
+          asset_name: ${{ env.BIN }}-${{ matrix.target }}.tar.gz
+          asset_content_type: application/gzip
