@@ -1,10 +1,23 @@
 [package]
 name = "ddiff"
 version = "0.1.0"
-authors = ["biosan <alessandro@biondi.me>"]
+authors = ["Alessandro Biondi (biosan) <alessandro@biondi.me>"]
 edition = "2018"
+license = "MIT"
+description = "CLI utility to compare directories like a superhero"
+readme = "README.md"
+homepage = "https://github.com/biosan/dirdiff"
+repository = "https://github.com/biosan/dirdiff"
+keywords = ["cli", "compare", "folders", "hash", "blake3"]
+categories = ["command-line-utilities"]
+exclude = ["ci/**/*", "doc/**/*", ".**/*"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[badges]
+maintenance = { status = "actively-developed" }
+
+[[bin]]
+name = "ddiff"
+path = "src/main.rs"
 
 [dependencies]
 indicatif = {version = "0.15", features = ["rayon"]}
